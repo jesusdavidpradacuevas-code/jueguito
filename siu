@@ -1,0 +1,145 @@
+import asyncio
+import random
+import pygame
+
+# Inicialización de Pygame
+pygame.init()
+ANCHO, ALTO = 800, 600
+pantalla = pygame.display.set_mode((ANCHO, ALTO))
+pygame.display.set_caption("Space Shooter Web")
+reloj = pygame.time.Clock()
+
+# Colores
+NEGRO = (15, 15, 30)
+VERDE = (0, 255, 150)
+ROJO = (255, 60, 60)
+AMARILLO = (255, 255, 0)
+BLANCO = (255, 255, 255)
+
+# Jugador
+player_pos = [ANCHO // 2, ALTO - 50]
+player_speed = 6
+
+# Listas de juego
+bullets = []
+bullet_speed = 8
+
+enemies = []
+enemy_speed = 3
+spawn_timer = 0
+
+score = 0
+game_over = False
+
+# Bucle asíncrono requerido para que funcione en páginas Web/GitHub
+async def main():
+    global spawn_timer, score, game_over, player_pos, bullets, enemies
+
+    running = True
+    while running:
+        pantalla.fill(NEGRO)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE and not game_over:
+                    bullets.append([player_pos[0] + 17, player_pos[1]])
+                if event.key == pygame.K_r and game_over:
+                    # Reiniciar juego
+                    player_pos = [ANCHO // 2, ALTO - 50]
+                    bullets.clear()
+                    enemies.clear()
+                    score = 0
+                    game_over = False
+
+        if not game_over:
+            # Movimiento del jugador
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT] and player_pos[0] > 0:
+                player_pos[0] -= player_speed
+            if keys[pygame.K_RIGHT] and player_pos[0] < ANCHO - 40:
+                player_pos[0] += player_speed
+
+            # Crear enemigos cada cierto tiempo
+            spawn_timer += 1
+            if spawn_timer > 30:
+                enemies.append([random.randint(0, ANCHO - 30), -30])
+                spawn_timer = 0
+
+            # Actualizar balas
+            for bullet in bullets[:]:
+                bullet[1] -= bullet_speed
+                if bullet[1] < 0:
+                    bullets.remove(bullet)
+                else:
+                    pygame.draw.rect(
+                        pantalla, AMARILLO, (bullet[0], bullet[1], 6, 14)
+                    )
+
+            # Actualizar enemigos y colisiones
+            for enemy in enemies[:]:
+                enemy[1] += enemy_speed
+
+                # Dibujar enemigo
+                pygame.draw.rect(
+                    pantalla, ROJO, (enemy[0], enemy[1], 30, 30)
+                )
+
+                # Colisión bala vs enemigo
+                for bullet in bullets[:]:
+                    if (
+                        enemy[0] < bullet[0] < enemy[0] + 30
+                        and enemy[1] < bullet[1] < enemy[1] + 30
+                    ):
+                        if bullet in bullets:
+                            bullets.remove(bullet)
+                        if enemy in enemies:
+                            enemies.remove(enemy)
+                        score += 10
+                        break
+
+                # Colisión enemigo vs jugador
+                if (
+                    enemy[1] + 30 >= player_pos[1]
+                    and enemy[0] < player_pos[0] + 40
+                    and enemy[0] + 30 > player_pos[0]
+                ):
+                    game_over = True
+
+                # Eliminar si sale de pantalla
+                elif enemy[1] > ALTO:
+                    if enemy in enemies:
+                        enemies.remove(enemy)
+
+            # Dibujar nave del jugador
+            pygame.draw.rect(
+                pantalla, VERDE, (player_pos[0], player_pos[1], 40, 30)
+            )
+
+        else:
+            # Pantalla de Game Over
+            fuente = pygame.font.SysFont(None, 45)
+            texto = fuente.render(
+                "GAME OVER - Presiona R para reiniciar", True, BLANCO
+            )
+            pantalla.blit(texto, (ANCHO // 2 - 280, ALTO // 2))
+
+        # Mostrar puntuación
+        fuente_puntos = pygame.font.SysFont(None, 30)
+        texto_puntos = fuente_puntos.render(
+            f"Puntos: {score}", True, BLANCO
+        )
+        pantalla.blit(texto_puntos, (10, 10))
+
+        pygame.display.flip()
+        reloj.tick(60)
+
+        # Requerido para la web (evita que el navegador se congele)
+        await asyncio.sleep(0)
+
+    pygame.quit()
+
+
+# Ejecutar juego
+asyncio.run(main())
